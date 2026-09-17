@@ -6,4 +6,4 @@
 - [x] Uppdragsdetalj och acceptbekräftelse
 - [x] Femstegsflöde för publicering
 - [x] Betalning, aviseringar, förtroendesign och tomläge
-- [ ] Verifiera mobil- och desktopvy
+- [x] Verifiera mobil- och desktopvy
