@@ -1,24 +1,138 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import {
+  Bell, BriefcaseBusiness, Check, ChevronLeft, ChevronRight, CircleUserRound,
+  Clock3, Compass, CreditCard, Home, ListFilter, Map, MapPin, Mic, Navigation,
+  Plus, Route as RouteIcon, Search, ShieldCheck, Sparkles, Star, UserRound,
+  WalletCards, X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ahmedProfile from "@/assets/ahmed-profile.jpg";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Nära — små uppdrag, nära dig" },
+      { name: "description", content: "Behöver du hjälp? Lägg ut ett uppdrag och få hjälp av någon nära dig." },
+      { property: "og:title", content: "Nära — små uppdrag, nära dig" },
+      { property: "og:description", content: "Vad behöver du hjälp med? Någon i närheten kan fixa det." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: App,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+type View = "home" | "explore" | "activity" | "profile";
+type Job = { id: number; emoji: string; category: string; title: string; detail: string; price: number; distance: string; time: string; urgent?: boolean };
+
+const jobs: Job[] = [
+  { id: 1, emoji: "⚡", category: "Akut", title: "Behöver bensin", detail: "10 liter bensin till E4", price: 500, distance: "3,2 km bort", time: "Nu", urgent: true },
+  { id: 2, emoji: "🛒", category: "Ärende", title: "Handla på Coop", detail: "Mjölk, ägg, kaffe och blöjor", price: 200, distance: "1,8 km bort", time: "Idag" },
+  { id: 3, emoji: "📦", category: "Hämtning", title: "Hämta mitt paket", detail: "PostNord, Sollentuna", price: 150, distance: "2,4 km bort", time: "Senast 18:00" },
+  { id: 4, emoji: "🚗", category: "Transport", title: "Flytta två kartonger", detail: "Vasastan till Solna", price: 350, distance: "1,4 km bort", time: "Imorgon" },
+];
+
+const nav = [
+  { id: "home" as const, label: "Hem", icon: Home },
+  { id: "explore" as const, label: "Utforska", icon: Compass },
+  { id: "activity" as const, label: "Aktivitet", icon: BriefcaseBusiness },
+  { id: "profile" as const, label: "Profil", icon: CircleUserRound },
+];
+
+function App() {
+  const [view, setView] = useState<View>("home");
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-dvh bg-background text-foreground">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-card px-5 py-7 lg:flex lg:flex-col">
+        <Brand />
+        <nav className="mt-12 space-y-2" aria-label="Huvudmeny">
+          {nav.map((item) => <NavButton key={item.id} active={view === item.id} item={item} onClick={() => { setView(item.id); setSelectedJob(null); }} />)}
+        </nav>
+        <div className="mt-auto rounded-2xl bg-accent p-4">
+          <div className="mb-3 flex size-9 items-center justify-center rounded-full bg-card text-primary"><Sparkles /></div>
+          <p className="text-sm font-bold">Något du behöver?</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Beskriv det med egna ord. Vi ordnar resten.</p>
+          <Button className="mt-4 w-full" size="sm" onClick={() => setCreateOpen(true)}><Plus /> Lägg ut uppdrag</Button>
+        </div>
+      </aside>
+
+      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/95 px-5 backdrop-blur lg:ml-60 lg:px-8">
+        <div className="lg:hidden"><Brand /></div>
+        <div className="hidden lg:block"><p className="text-sm text-muted-foreground">Stockholm</p><p className="font-bold">Hej, Sofia!</p></div>
+        <Button variant="ghost" size="icon" aria-label="Aviseringar" className="relative" onClick={() => setNoticeOpen(true)}><Bell /><span className="absolute right-2 top-2 size-2 rounded-full bg-primary" /></Button>
+      </header>
+
+      <main className="pb-24 lg:ml-60 lg:pb-0">
+        <div className="mx-auto grid max-w-[1380px] lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
+            {selectedJob ? <JobDetail job={selectedJob} onBack={() => setSelectedJob(null)} /> : view === "home" ? <HomeView onCreate={() => setCreateOpen(true)} onJob={setSelectedJob} /> : view === "explore" ? <ExploreView onJob={setSelectedJob} /> : view === "activity" ? <ActivityView /> : <ProfileView />}
+          </section>
+          <RightPanel onJob={setSelectedJob} />
+        </div>
+      </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden" aria-label="Huvudmeny">
+        {nav.map((item) => { const Icon = item.icon; const active = view === item.id; return <Button key={item.id} variant="ghost" className={`h-14 flex-col gap-1 rounded-xl px-1 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`} onClick={() => { setView(item.id); setSelectedJob(null); }}><Icon className="size-5" />{item.label}</Button>; })}
+      </nav>
+      {createOpen && <CreateFlow onClose={() => setCreateOpen(false)} />}
+      {noticeOpen && <Notifications onClose={() => setNoticeOpen(false)} />}
     </div>
   );
 }
+
+function Brand() { return <div className="flex items-center gap-2.5"><div className="flex size-9 items-center justify-center rounded-xl bg-primary text-lg font-extrabold text-primary-foreground">N</div><span className="text-xl font-extrabold">Nära</span></div>; }
+
+function NavButton({ active, item, onClick }: { active: boolean; item: typeof nav[number]; onClick: () => void }) { const Icon = item.icon; return <Button variant="ghost" className={`w-full justify-start ${active ? "bg-accent text-accent-foreground" : "text-muted-foreground"}`} onClick={onClick}><Icon />{item.label}</Button>; }
+
+function HomeView({ onCreate, onJob }: { onCreate: () => void; onJob: (job: Job) => void }) {
+  const [query, setQuery] = useState("");
+  const filtered = jobs.filter((j) => `${j.title} ${j.detail} ${j.category}`.toLowerCase().includes(query.toLowerCase()));
+  return <div className="animate-soft-in">
+    <div className="mb-7"><p className="mb-2 text-sm font-semibold text-primary">Hjälp finns runt hörnet</p><h1 className="max-w-xl text-3xl font-extrabold leading-tight sm:text-4xl">Vad behöver du hjälp med?</h1><p className="mt-3 text-muted-foreground">Beskriv det du behöver. Någon i närheten kan fixa det.</p></div>
+    <div className="relative rounded-2xl border border-border bg-card p-2 shadow-card"><div className="flex min-h-16 items-center gap-3 px-3"><Search className="size-5 text-muted-foreground" /><input value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground" placeholder="Beskriv vad du behöver..." aria-label="Sök eller beskriv ett uppdrag" /><Sparkles className="size-4 text-primary" /><Button variant="soft" size="icon" aria-label="Tala in din förfrågan"><Mic /></Button></div></div>
+    <section className="mt-8"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold">Populärt just nu</h2></div><div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">{["🚗 Transport","🛒 Ärenden","🏠 Hem","📦 Hämtning","🔧 Småjobb","🐕 Djur","⚡ Akut"].map((c) => <Button key={c} variant="outline" className="shrink-0">{c}</Button>)}</div></section>
+    <Button size="lg" className="mt-6 w-full sm:w-auto" onClick={onCreate}><Plus /> Lägg ut ett uppdrag</Button>
+    <section className="mt-10"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-xl font-extrabold">Uppdrag nära dig</h2><p className="mt-1 text-sm text-muted-foreground">Inom 5 km från Stockholm</p></div><Button variant="ghost" size="sm">Visa alla <ChevronRight /></Button></div><div className="grid gap-3 xl:grid-cols-2">{filtered.slice(0,3).map((job) => <JobCard key={job.id} job={job} onOpen={() => onJob(job)} />)}</div>{filtered.length === 0 && <EmptyState onCreate={onCreate} />}</section>
+  </div>;
+}
+
+function JobCard({ job, onOpen }: { job: Job; onOpen: () => void }) { return <article onClick={onOpen} className="group cursor-pointer rounded-2xl border border-border bg-card p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 active:scale-[0.99]">
+  <div className="flex items-start justify-between gap-4"><div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase ${job.urgent ? "bg-accent text-accent-foreground" : "bg-secondary text-secondary-foreground"}`}>{job.emoji} {job.category}</span><h3 className="mt-3 text-lg font-extrabold">{job.title}</h3><p className="mt-1 text-sm text-muted-foreground">{job.detail}</p></div><strong className="shrink-0 text-xl">{job.price} kr</strong></div>
+  <div className="mt-5 flex items-end justify-between gap-3 border-t border-border pt-4"><span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3.5" /> {job.distance} · {job.time}</span><Button size="sm" onClick={(e) => { e.stopPropagation(); onOpen(); }}>Hjälp till</Button></div>
+ </article>; }
+
+function ExploreView({ onJob }: { onJob: (job: Job) => void }) { const [mode, setMode] = useState<"list" | "map">("list"); const [routeMode, setRouteMode] = useState(false); return <div className="animate-soft-in"><div className="flex items-start justify-between"><div><h1 className="text-3xl font-extrabold">Uppdrag nära dig</h1><p className="mt-2 text-muted-foreground">Hitta något som passar din tid och väg.</p></div><div className="flex rounded-xl border border-border bg-card p-1"><Button variant={mode === "list" ? "soft" : "ghost"} size="sm" aria-label="Listvy" onClick={() => setMode("list")}><ListFilter /></Button><Button variant={mode === "map" ? "soft" : "ghost"} size="sm" aria-label="Kartvy" onClick={() => setMode("map")}><Map /></Button></div></div>
+  <button onClick={() => setRouteMode(!routeMode)} className="mt-7 flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-primary/20 bg-accent p-5 text-left transition-transform active:scale-[0.99]"><span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><RouteIcon /></span><span className="min-w-0 flex-1"><strong className="block">På vägen</strong><span className="mt-1 block text-sm text-muted-foreground">Tjäna extra på en resa du redan gör</span></span><ChevronRight className="text-primary" /></button>
+  {routeMode && <div className="mt-3 animate-soft-in rounded-2xl border border-border bg-card p-5 shadow-card"><div className="flex items-center gap-3"><MapPin className="text-primary" /><div><p className="text-xs text-muted-foreground">Din rutt</p><p className="font-bold">Stockholm → Uppsala</p></div></div><div className="my-5 h-px bg-border" />{[["📦","Hämta paket","+100 kr"],["🛒","Handla på ICA","+75 kr"],["📄","Lämna dokument","+150 kr"]].map((x) => <div key={x[1]} className="flex items-center gap-3 py-2"><span>{x[0]}</span><span className="flex-1 text-sm font-semibold">{x[1]}</span><strong className="text-sm text-success">{x[2]}</strong></div>)}<Button className="mt-4 w-full"><Navigation /> Jag är på väg någonstans</Button></div>}
+  <div className="-mx-5 mt-7 flex gap-2 overflow-x-auto px-5 pb-2 sm:mx-0 sm:px-0">{["Avstånd","Pris","Kategori","Tid"].map((x) => <Button key={x} variant="outline" size="sm" className="shrink-0">{x} <ChevronRight className="rotate-90" /></Button>)}</div>
+  {mode === "map" ? <MapPanel tall onJob={onJob} /> : <div className="mt-5 grid gap-3 xl:grid-cols-2">{jobs.map((job) => <JobCard key={job.id} job={job} onOpen={() => onJob(job)} />)}</div>}</div>; }
+
+function ActivityView() { const [tab, setTab] = useState<"need" | "help">("need"); return <div className="animate-soft-in"><h1 className="text-3xl font-extrabold">Aktivitet</h1><div className="mt-6 grid grid-cols-2 rounded-xl bg-secondary p-1"><Button variant={tab === "need" ? "outline" : "ghost"} onClick={() => setTab("need")}>Jag behöver hjälp</Button><Button variant={tab === "help" ? "outline" : "ghost"} onClick={() => setTab("help")}>Jag hjälper</Button></div><div className="mt-8 space-y-7"><ActivityGroup label="Aktivt"><ActivityCard emoji={tab === "need" ? "⚡" : "🔧"} title={tab === "need" ? "Behöver bensin" : "Montera TV"} price={tab === "need" ? 500 : 425} status={tab === "need" ? "Väntar på hjälpare" : "Pågår · Klar senast 18:00"} /></ActivityGroup><ActivityGroup label="Slutfört"><ActivityCard emoji="📦" title="Hämtade paket" price={250} status="Slutfört" done /></ActivityGroup></div></div>; }
+function ActivityGroup({ label, children }: { label: string; children: React.ReactNode }) { return <section><h2 className="mb-3 text-xs font-extrabold uppercase text-muted-foreground">{label}</h2>{children}</section>; }
+function ActivityCard({ emoji, title, price, status, done }: { emoji: string; title: string; price: number; status: string; done?: boolean }) { return <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-card"><span className="flex size-12 items-center justify-center rounded-xl bg-secondary text-xl">{emoji}</span><div className="min-w-0 flex-1"><h3 className="font-bold">{title}</h3><p className={`mt-1 flex items-center gap-1 text-sm ${done ? "text-success" : "text-muted-foreground"}`}>{done && <Check className="size-4" />}{status}</p></div><strong>{price} kr</strong></div>; }
+
+function ProfileView() { return <div className="animate-soft-in"><h1 className="text-3xl font-extrabold">Profil</h1><div className="mt-7 flex items-center gap-5"><img src={ahmedProfile} alt="Ahmed" width={816} height={816} className="size-24 rounded-full object-cover ring-4 ring-card shadow-card" /><div><h2 className="text-2xl font-extrabold">Ahmed</h2><p className="mt-1 flex items-center gap-1 font-bold"><Star className="size-4 fill-current text-primary" /> 4.9 <span className="font-normal text-muted-foreground">· 127 uppdrag</span></p><span className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-bold text-success"><Check className="size-3" /> Verifierad</span></div></div><div className="mt-8 grid gap-3 sm:grid-cols-3">{[[ShieldCheck,"BankID-verifierad"],[UserRound,"Telefonnummer verifierat"],[CreditCard,"Betalningshistorik"]].map(([Icon,label]) => { const C = Icon as typeof ShieldCheck; return <div key={label as string} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-semibold"><C className="text-success" />{label as string}</div>; })}</div><section className="mt-9"><h2 className="text-xl font-extrabold">Genomförda uppdrag</h2><p className="mt-1 text-sm text-muted-foreground">Vad andra säger om Ahmed</p><div className="mt-4 space-y-3">{[["Sofia L.","Superbra och snabb hjälp!"],["Oskar N.","Trevlig, punktlig och smidig kommunikation."]].map(([name,text]) => <div key={name} className="rounded-2xl border border-border bg-card p-5"><div className="text-sm text-primary">★★★★★</div><p className="mt-2 font-semibold">“{text}”</p><p className="mt-2 text-xs text-muted-foreground">{name} · verifierat uppdrag</p></div>)}</div></section></div>; }
+
+function JobDetail({ job, onBack }: { job: Job; onBack: () => void }) { const [confirm, setConfirm] = useState(false); const [accepted, setAccepted] = useState(false); if (accepted) return <div className="mx-auto max-w-lg py-10 text-center animate-soft-in"><div className="mx-auto flex size-20 animate-check-pop items-center justify-center rounded-full bg-success-soft text-success"><Check className="size-10" /></div><h1 className="mt-6 text-3xl font-extrabold">Uppdraget är ditt!</h1><p className="mt-3 text-muted-foreground">Ahmed har fått veta att du är på väg. Ni kan nu skriva till varandra.</p><Button className="mt-7" onClick={onBack}>Till mina uppdrag</Button></div>;
+  return <div className="mx-auto max-w-2xl animate-soft-in"><Button variant="ghost" className="-ml-3 mb-5" onClick={onBack}><ChevronLeft /> Tillbaka</Button><div className="flex size-16 items-center justify-center rounded-2xl bg-accent text-3xl">{job.emoji}</div><div className="mt-5 flex items-start justify-between gap-4"><div><span className="text-xs font-extrabold uppercase text-primary">{job.category}</span><h1 className="mt-1 text-3xl font-extrabold">{job.title}</h1></div><strong className="text-2xl">{job.price} kr</strong></div><p className="mt-5 text-base leading-relaxed text-muted-foreground">Jag sitter fast på E4:an och behöver 10 liter bensin. Kan någon hjälpa mig så snart som möjligt?</p><div className="mt-7 h-52 overflow-hidden rounded-2xl border border-border"><MapPanel compact /></div><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground"><span className="flex items-center gap-1"><MapPin className="size-4" /> 3,2 km från dig</span><span className="flex items-center gap-1"><Clock3 className="size-4" /> Publicerad för 4 min sedan</span></div><div className="my-8 h-px bg-border" /><div className="flex items-center gap-4"><img src={ahmedProfile} alt="Ahmed" width={816} height={816} className="size-14 rounded-full object-cover" /><div><p className="font-extrabold">Ahmed</p><p className="mt-1 flex items-center gap-1 text-sm"><Star className="size-4 fill-current text-primary" /> 4.9 · 127 uppdrag</p><p className="mt-1 flex items-center gap-1 text-xs font-semibold text-success"><ShieldCheck className="size-4" /> Verifierad med BankID</p></div></div><Button size="lg" className="mt-8 w-full" onClick={() => setConfirm(true)}>Jag kan hjälpa</Button>{confirm && <Modal onClose={() => setConfirm(false)}><div className="text-center"><div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent text-primary"><WalletCards /></div><h2 className="mt-5 text-2xl font-extrabold">Vill du ta detta uppdrag?</h2><p className="mt-2 text-sm text-muted-foreground">Betalningen är säkrad innan du börjar.</p></div><PriceRows /><Button size="lg" className="mt-6 w-full" onClick={() => setAccepted(true)}>Acceptera uppdrag</Button></Modal>}</div>; }
+
+function PriceRows() { return <div className="mt-6 space-y-3 rounded-xl bg-secondary p-4 text-sm"><div className="flex justify-between"><span>Du får</span><strong>425 kr</strong></div><div className="flex justify-between text-muted-foreground"><span>Plattformsavgift</span><span>75 kr</span></div><div className="h-px bg-border" /><div className="flex justify-between"><span>Kundens total</span><strong>500 kr</strong></div><p className="flex gap-2 pt-2 text-left text-xs text-muted-foreground"><ShieldCheck className="size-4 shrink-0 text-success" /> Betalningen reserveras tills uppdraget är slutfört.</p></div>; }
+
+function CreateFlow({ onClose }: { onClose: () => void }) { const [step, setStep] = useState(1); const [text, setText] = useState(""); const [price, setPrice] = useState("500"); const [when, setWhen] = useState("Nu"); const [done, setDone] = useState(false); const canContinue = step !== 1 || text.trim().length > 4; if (done) return <Modal onClose={onClose}><div className="py-7 text-center"><div className="mx-auto flex size-20 animate-check-pop items-center justify-center rounded-full bg-success-soft text-success"><Check className="size-10" /></div><h2 className="mt-6 text-2xl font-extrabold">Ditt uppdrag är publicerat!</h2><p className="mt-3 text-sm text-muted-foreground">Vi meddelar dig så fort någon vill hjälpa till.</p><Button className="mt-7 w-full" onClick={onClose}>Klart</Button></div></Modal>;
+  return <Modal onClose={onClose} wide><div className="mb-7"><div className="flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Steg {step} av 5</span><span>{step * 20}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${step * 20}%` }} /></div></div>
+    <div className="min-h-[310px] animate-soft-in" key={step}>{step === 1 ? <><p className="text-sm font-semibold text-primary">Berätta med egna ord</p><h2 className="mt-2 text-2xl font-extrabold">Vad behöver du hjälp med?</h2><textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="Exempel: Kan någon hämta mitt paket?" className="mt-6 min-h-36 w-full resize-none rounded-2xl border border-input bg-card p-4 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10" />{text.length > 12 && <div className="mt-4 flex gap-3 rounded-xl bg-accent p-4"><Sparkles className="shrink-0 text-primary" /><div><p className="text-xs font-bold text-primary">Automatiskt förslag</p><p className="mt-1 font-bold">⚡ Akut hjälp · Leverans av bensin</p></div></div>}</> : step === 2 ? <><p className="text-sm font-semibold text-primary">Ersättning</p><h2 className="mt-2 text-2xl font-extrabold">Vad vill du betala?</h2><div className="mt-8 flex items-baseline justify-center gap-2"><input value={price} onChange={(e) => setPrice(e.target.value.replace(/\D/g,""))} className="w-32 bg-transparent text-right text-5xl font-extrabold outline-none" inputMode="numeric" aria-label="Pris" /><span className="text-2xl font-bold">kr</span></div><p className="mt-5 text-center text-sm text-muted-foreground">Liknande uppdrag brukar ligga runt <strong className="text-foreground">400–600 kr</strong></p><p className="mt-6 flex justify-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-success" /> Du betalar endast när uppdraget är slutfört.</p></> : step === 3 ? <><p className="text-sm font-semibold text-primary">Tid</p><h2 className="mt-2 text-2xl font-extrabold">När behöver du hjälp?</h2><div className="mt-7 grid grid-cols-2 gap-3">{["Nu","Idag","Imorgon","Välj tid"].map((x) => <Button key={x} variant={when === x ? "default" : "outline"} className="h-16" onClick={() => setWhen(x)}>{x === "Välj tid" && <Clock3 />}{x}</Button>)}</div></> : step === 4 ? <><p className="text-sm font-semibold text-primary">Plats</p><h2 className="mt-2 text-2xl font-extrabold">Var?</h2><div className="mt-6 h-40 overflow-hidden rounded-2xl border border-border"><MapPanel compact /></div><div className="mt-4 flex items-center gap-3 rounded-xl border border-border p-4"><MapPin className="text-primary" /><div className="flex-1"><p className="font-bold">Din plats</p><p className="text-sm text-muted-foreground">E4, Sollentuna</p></div><Button variant="ghost" size="sm">Ändra</Button></div></> : <><p className="text-sm font-semibold text-primary">Förhandsvisning</p><h2 className="mt-2 text-2xl font-extrabold">Så här ser ditt uppdrag ut</h2><div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-card"><span className="rounded-full bg-accent px-2.5 py-1 text-xs font-extrabold uppercase text-accent-foreground">⚡ Akut</span><div className="mt-4 flex justify-between gap-4"><div><h3 className="text-xl font-extrabold">Behöver bensin</h3><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{text || "Jag sitter fast på E4:an och behöver 10 liter bensin."}</p></div><strong className="shrink-0 text-xl">{price} kr</strong></div><p className="mt-5 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3.5" /> Stockholm · {when}</p></div></>}</div>
+    <div className="mt-7 flex gap-3">{step > 1 && <Button variant="outline" size="lg" onClick={() => setStep(step - 1)}><ChevronLeft /> Tillbaka</Button>}<Button size="lg" className="flex-1" disabled={!canContinue} onClick={() => step < 5 ? setStep(step + 1) : setDone(true)}>{step === 5 ? "Publicera uppdrag" : "Fortsätt"}{step < 5 && <ChevronRight />}</Button></div></Modal>; }
+
+function Modal({ children, onClose, wide }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true"><div className={`relative max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-background p-6 shadow-card sm:rounded-3xl sm:p-8 ${wide ? "sm:max-w-xl" : "sm:max-w-md"}`}><Button variant="ghost" size="icon" className="absolute right-4 top-4 z-10" onClick={onClose} aria-label="Stäng"><X /></Button>{children}</div></div>; }
+
+function Notifications({ onClose }: { onClose: () => void }) { return <Modal onClose={onClose}><h2 className="pr-12 text-2xl font-extrabold">Aviseringar</h2><div className="mt-6 space-y-1">{[["🎉","Någon vill hjälpa dig!","Ahmed har svarat på ditt uppdrag."],["📍","Ahmed är på väg","Beräknad ankomst om 12 minuter."],["✓","Uppdraget är klart","Bekräfta för att släppa betalningen."],["💰","425 kr har betalats ut","Pengarna finns på ditt saldo."]].map((n,i) => <div key={n[1]} className={`flex gap-3 rounded-xl p-3 ${i === 0 ? "bg-accent" : ""}`}><span className="text-xl">{n[0]}</span><div><p className="text-sm font-bold">{n[1]}</p><p className="mt-1 text-xs text-muted-foreground">{n[2]}</p></div></div>)}</div></Modal>; }
+
+function EmptyState({ onCreate }: { onCreate: () => void }) { return <div className="rounded-2xl border border-dashed border-border py-12 text-center"><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-secondary"><Search /></div><p className="mt-4 font-bold">Det finns inga uppdrag nära dig just nu.</p><p className="mt-1 text-sm text-muted-foreground">Var först med att lägga ut ett.</p><Button className="mt-5" onClick={onCreate}><Plus /> Lägg ut uppdrag</Button></div>; }
+
+function RightPanel({ onJob }: { onJob: (job: Job) => void }) { return <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] border-l border-border bg-card p-6 lg:block"><div className="flex items-center justify-between"><div><h2 className="font-extrabold">Nära dig</h2><p className="text-xs text-muted-foreground">Stockholm · 5 km</p></div><Button variant="ghost" size="icon" aria-label="Kartinställningar"><ListFilter /></Button></div><div className="mt-4 h-[48%] overflow-hidden rounded-2xl border border-border"><MapPanel compact onJob={onJob} /></div><h3 className="mt-6 text-xs font-extrabold uppercase text-muted-foreground">Senast publicerat</h3><div className="mt-3 space-y-2">{jobs.slice(0,2).map((j) => <button key={j.id} onClick={() => onJob(j)} className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition hover:bg-secondary"><span className="flex size-10 items-center justify-center rounded-xl bg-secondary">{j.emoji}</span><span className="min-w-0 flex-1"><strong className="block truncate text-sm">{j.title}</strong><span className="text-xs text-muted-foreground">{j.distance}</span></span><strong className="text-sm">{j.price} kr</strong></button>)}</div></aside>; }
+
+function MapPanel({ tall, compact, onJob }: { tall?: boolean; compact?: boolean; onJob?: (job: Job) => void }) { const markers = useMemo(() => jobs.slice(0,3), []); return <div className={`relative w-full overflow-hidden bg-secondary ${tall ? "mt-5 h-[520px] rounded-2xl border border-border" : "h-full"}`}><div className="absolute inset-0 opacity-60" style={{ backgroundImage: "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)", backgroundSize: compact ? "34px 34px" : "52px 52px", transform: "rotate(-8deg) scale(1.2)" }} /><div className="absolute left-[18%] top-[35%] h-2 w-[75%] rotate-12 rounded-full bg-card shadow-card" /><div className="absolute left-[45%] top-[12%] h-[80%] w-2 -rotate-12 rounded-full bg-card shadow-card" />{markers.map((m,i) => <button key={m.id} aria-label={m.title} onClick={() => onJob?.(m)} className={`absolute flex cursor-pointer items-center gap-1 rounded-full border-2 border-card bg-primary px-2.5 py-1.5 text-xs font-extrabold text-primary-foreground shadow-action transition-transform hover:scale-105 ${i === 0 ? "left-[20%] top-[28%]" : i === 1 ? "right-[18%] top-[48%]" : "bottom-[18%] left-[42%]"}`}>{m.emoji} {m.price}</button>)}<div className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[5px] border-card bg-success shadow-card" /></div>; }
