@@ -7,3 +7,5 @@
 - [x] Femstegsflöde för publicering
 - [x] Betalning, aviseringar, förtroendesign och tomläge
 - [x] Verifiera mobil- och desktopvy
+- [x] Byt namn till Helpy och förenkla startsidan
+- [x] Visa nettobelopp vid accept och historik för utförda jobb
