@@ -14,7 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      jobs: {
+        Row: {
+          category: string
+          created_at: string
+          detail: string
+          helper_id: string | null
+          id: string
+          location: string
+          price: number
+          requester_id: string
+          status: string
+          timing: string
+          title: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          detail?: string
+          helper_id?: string | null
+          id?: string
+          location?: string
+          price: number
+          requester_id: string
+          status?: string
+          timing?: string
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          detail?: string
+          helper_id?: string | null
+          id?: string
+          location?: string
+          price?: number
+          requester_id?: string
+          status?: string
+          timing?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          job_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Insert: {
+          comment?: string
+          created_at?: string
+          id?: string
+          job_id: string
+          rating: number
+          reviewee_id: string
+          reviewer_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          rating?: number
+          reviewee_id?: string
+          reviewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
