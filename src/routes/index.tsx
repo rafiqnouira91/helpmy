@@ -24,14 +24,50 @@ export const Route = createFileRoute("/")({
 });
 
 type View = "home" | "explore" | "activity" | "profile";
-type Job = { id: number; emoji: string; category: string; title: string; detail: string; price: number; distance: string; time: string; urgent?: boolean };
+type Profile = { id: string; display_name: string; avatar_url: string | null };
+type Job = Tables<"jobs"> & { emoji: string; urgent: boolean; requester?: Profile };
 
-const jobs: Job[] = [
-  { id: 1, emoji: "⚡", category: "Akut", title: "Behöver bensin", detail: "10 liter bensin till E4", price: 500, distance: "3,2 km bort", time: "Nu", urgent: true },
-  { id: 2, emoji: "🛒", category: "Ärende", title: "Handla på Coop", detail: "Mjölk, ägg, kaffe och blöjor", price: 200, distance: "1,8 km bort", time: "Idag" },
-  { id: 3, emoji: "📦", category: "Hämtning", title: "Hämta mitt paket", detail: "PostNord, Sollentuna", price: 150, distance: "2,4 km bort", time: "Senast 18:00" },
-  { id: 4, emoji: "🚗", category: "Transport", title: "Flytta två kartonger", detail: "Vasastan till Solna", price: 350, distance: "1,4 km bort", time: "Imorgon" },
-];
+const EMOJI: Record<string, string> = { Akut: "⚡", Transport: "🚗", "Ärende": "🛒", Hem: "🏠", "Hämtning": "📦", "Småjobb": "🔧", Djur: "🐕" };
+const payoutOf = (price: number) => Math.round(price * 0.85);
+
+function timeAgo(iso: string) {
+  const m = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 60) return `${m} min sedan`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} tim sedan`;
+  return `${Math.round(h / 24)} dagar sedan`;
+}
+
+async function withProfiles(rows: Tables<"jobs">[]): Promise<Job[]> {
+  const ids = [...new Set(rows.flatMap((r) => [r.requester_id, r.helper_id]).filter(Boolean))] as string[];
+  const { data: profs } = ids.length ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", ids) : { data: [] as Profile[] };
+  const map = new Map((profs ?? []).map((p) => [p.id, p]));
+  return rows.map((r) => ({ ...r, emoji: EMOJI[r.category] ?? "✨", urgent: r.category === "Akut", requester: map.get(r.requester_id) }));
+}
+
+async function fetchOpenJobs() {
+  const { data, error } = await supabase.from("jobs").select("*").eq("status", "open").order("created_at", { ascending: false });
+  if (error) throw error;
+  return withProfiles(data);
+}
+
+function guessJob(text: string) {
+  const t = text.toLowerCase();
+  const rules: [string, string[]][] = [
+    ["Akut", ["akut", "snabbt", "bensin", "fast", "dog", "nu direkt", "låst"]],
+    ["Hämtning", ["paket", "hämta", "postnord", "dhl", "lämna"]],
+    ["Ärende", ["handla", "coop", "ica", "affär", "apotek", "köpa"]],
+    ["Transport", ["flytta", "bära", "soffa", "kartong", "skjuts", "bil"]],
+    ["Djur", ["hund", "katt", "rasta", "djur"]],
+    ["Småjobb", ["montera", "tv", "laga", "fixa", "skruva", "borra"]],
+    ["Hem", ["städa", "tvätta", "trädgård", "gräs", "fönster"]],
+  ];
+  const category = rules.find(([, words]) => words.some((w) => t.includes(w)))?.[0] ?? "Småjobb";
+  const first = text.trim().split(/[.!?\n]/)[0] ?? "";
+  const title = first.length > 40 ? first.slice(0, 40).trim() + "…" : first;
+  const suggested: Record<string, number> = { Akut: 500, "Hämtning": 150, "Ärende": 200, Transport: 350, Djur: 200, "Småjobb": 400, Hem: 300 };
+  return { category, title: title.charAt(0).toUpperCase() + title.slice(1), suggested: suggested[category] ?? 300 };
+}
 
 const nav = [
   { id: "home" as const, label: "Hem", icon: Home },
@@ -40,11 +76,22 @@ const nav = [
   { id: "profile" as const, label: "Profil", icon: CircleUserRound },
 ];
 
+function Avatar({ p, size = "size-14" }: { p?: Profile | null; size?: string }) {
+  if (p?.display_name === "Ahmed" && !p.avatar_url) return <img src={ahmedProfile} alt="Ahmed" width={816} height={816} className={`${size} rounded-full object-cover`} />;
+  return <div className={`${size} flex shrink-0 items-center justify-center rounded-full bg-accent text-lg font-extrabold text-accent-foreground`}>{(p?.display_name ?? "?").charAt(0).toUpperCase()}</div>;
+}
+
 function App() {
+  const navigate = useNavigate();
+  const { user } = useSession();
   const [view, setView] = useState<View>("home");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const { data: jobs = [], isLoading } = useQuery({ queryKey: ["jobs", "open"], queryFn: fetchOpenJobs });
+  const { data: me } = useQuery({ queryKey: ["profile", user?.id], enabled: !!user, queryFn: async () => (await supabase.from("profiles").select("id, display_name, avatar_url").eq("id", user!.id).maybeSingle()).data });
+  const requireAuth = () => { if (!user) { navigate({ to: "/auth" }); return false; } return true; };
+  const openCreate = () => { if (requireAuth()) setCreateOpen(true); };
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-card px-5 py-7 lg:flex lg:flex-col">
@@ -56,30 +103,34 @@ function App() {
           <div className="mb-3 flex size-9 items-center justify-center rounded-full bg-card text-primary"><Sparkles /></div>
           <p className="text-sm font-bold">Något du behöver?</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Beskriv det med egna ord. Vi ordnar resten.</p>
-          <Button className="mt-4 w-full" size="sm" onClick={() => setCreateOpen(true)}><Plus /> Lägg ut uppdrag</Button>
+          <Button className="mt-4 w-full" size="sm" onClick={openCreate}><Plus /> Lägg ut uppdrag</Button>
         </div>
       </aside>
 
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/95 px-5 backdrop-blur lg:ml-60 lg:px-8">
         <div className="lg:hidden"><Brand /></div>
-        <div className="hidden lg:block"><p className="text-sm text-muted-foreground">Stockholm</p><p className="font-bold">Hej, Sofia!</p></div>
-        <Button variant="ghost" size="icon" aria-label="Aviseringar" className="relative" onClick={() => setNoticeOpen(true)}><Bell /><span className="absolute right-2 top-2 size-2 rounded-full bg-primary" /></Button>
+        <div className="hidden lg:block"><p className="text-sm text-muted-foreground">Stockholm</p><p className="font-bold">{me ? `Hej, ${me.display_name}!` : "Välkommen till Helpy"}</p></div>
+        {user ? <Button variant="ghost" size="icon" aria-label="Aviseringar" onClick={() => setNoticeOpen(true)}><Bell /></Button> : <Button size="sm" variant="outline" onClick={() => navigate({ to: "/auth" })}>Logga in</Button>}
       </header>
 
       <main className="pb-24 lg:ml-60 lg:pb-0">
         <div className="mx-auto grid max-w-[1380px] lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
-            {selectedJob ? <JobDetail job={selectedJob} onBack={() => setSelectedJob(null)} /> : view === "home" ? <HomeView onCreate={() => setCreateOpen(true)} onJob={setSelectedJob} /> : view === "explore" ? <ExploreView onJob={setSelectedJob} /> : view === "activity" ? <ActivityView /> : <ProfileView />}
+            {selectedJob ? <JobDetail job={selectedJob} userId={user?.id} requireAuth={requireAuth} onBack={() => setSelectedJob(null)} onDone={() => { setSelectedJob(null); setView("activity"); }} />
+              : view === "home" ? <HomeView jobs={jobs} loading={isLoading} onCreate={openCreate} onJob={setSelectedJob} onAll={() => setView("explore")} />
+              : view === "explore" ? <ExploreView jobs={jobs} onJob={setSelectedJob} onCreate={openCreate} />
+              : view === "activity" ? <ActivityView userId={user?.id} onLogin={() => navigate({ to: "/auth" })} />
+              : <ProfileView userId={user?.id} onLogin={() => navigate({ to: "/auth" })} />}
           </section>
-          <RightPanel onJob={setSelectedJob} />
+          <RightPanel jobs={jobs} onJob={setSelectedJob} />
         </div>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden" aria-label="Huvudmeny">
         {nav.map((item) => { const Icon = item.icon; const active = view === item.id; return <Button key={item.id} variant="ghost" className={`h-14 flex-col gap-1 rounded-xl px-1 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`} onClick={() => { setView(item.id); setSelectedJob(null); }}><Icon className="size-5" />{item.label}</Button>; })}
       </nav>
-      {createOpen && <CreateFlow onClose={() => setCreateOpen(false)} />}
-      {noticeOpen && <Notifications onClose={() => setNoticeOpen(false)} />}
+      {createOpen && user && <CreateFlow userId={user.id} onClose={() => setCreateOpen(false)} />}
+      {noticeOpen && user && <Notifications userId={user.id} onClose={() => setNoticeOpen(false)} />}
     </div>
   );
 }
