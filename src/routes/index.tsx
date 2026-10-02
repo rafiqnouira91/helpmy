@@ -4,11 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { useSession } from "@/lib/use-session";
+import { PhoneVerify } from "@/components/PhoneVerify";
 import {
   Bell, BriefcaseBusiness, Check, ChevronLeft, ChevronRight, CircleUserRound,
   Clock3, Compass, CreditCard, Home, ListFilter, Map, MapPin, Navigation,
   Plus, Route as RouteIcon, Search, ShieldCheck, Sparkles, Star, UserRound,
-  WalletCards, X,
+  WalletCards, X, Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ahmedProfile from "@/assets/ahmed-profile.jpg";
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/")({
 
 type View = "home" | "explore" | "activity" | "profile";
 type Profile = { id: string; display_name: string; avatar_url: string | null };
-type Job = Tables<"jobs"> & { emoji: string; urgent: boolean; requester?: Profile };
+type Job = Tables<"jobs"> & { emoji: string; urgent: boolean; requester?: Profile | undefined };
 
 const EMOJI: Record<string, string> = { Akut: "⚡", Transport: "🚗", "Ärende": "🛒", Hem: "🏠", "Hämtning": "📦", "Småjobb": "🔧", Djur: "🐕" };
 const payoutOf = (price: number) => Math.round(price * 0.85);
@@ -94,8 +95,10 @@ function App() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const { data: jobs = [], isLoading } = useQuery({ queryKey: ["jobs", "open"], queryFn: fetchOpenJobs });
   const { data: me } = useQuery({ queryKey: ["profile", user?.id], enabled: !!user, queryFn: async () => (await supabase.from("profiles").select("id, display_name, avatar_url").eq("id", user!.id).maybeSingle()).data });
+  const [verifyOpen, setVerifyOpen] = useState<null | (() => void)>(null);
   const requireAuth = () => { if (!user) { navigate({ to: "/auth" }); return false; } return true; };
-  const openCreate = () => { if (requireAuth()) setCreateOpen(true); };
+  const requireVerified = (next: () => void) => { if (!requireAuth()) return; if (user?.phone_confirmed_at) next(); else setVerifyOpen(() => next); };
+  const openCreate = () => requireVerified(() => setCreateOpen(true));
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-border bg-card px-5 py-7 lg:flex lg:flex-col">
@@ -120,7 +123,7 @@ function App() {
       <main className="pb-24 lg:ml-60 lg:pb-0">
         <div className="mx-auto grid max-w-[1380px] lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 px-5 py-6 sm:px-8 lg:px-10 lg:py-9">
-            {selectedJob ? <JobDetail job={selectedJob} userId={user?.id} requireAuth={requireAuth} onBack={() => setSelectedJob(null)} onDone={() => { setSelectedJob(null); setView("activity"); }} />
+            {selectedJob ? <JobDetail job={selectedJob} userId={user?.id} requireVerified={requireVerified} onBack={() => setSelectedJob(null)} onDone={() => { setSelectedJob(null); setView("activity"); }} />
               : view === "home" ? <HomeView jobs={jobs} loading={isLoading} onCreate={openCreate} onJob={setSelectedJob} onAll={() => setView("explore")} />
               : view === "explore" ? <ExploreView jobs={jobs} onJob={setSelectedJob} onCreate={openCreate} />
               : view === "activity" ? <ActivityView userId={user?.id} onLogin={() => navigate({ to: "/auth" })} />
@@ -133,6 +136,7 @@ function App() {
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-border bg-card/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden" aria-label="Huvudmeny">
         {nav.map((item) => { const Icon = item.icon; const active = view === item.id; return <Button key={item.id} variant="ghost" className={`h-14 flex-col gap-1 rounded-xl px-1 text-[11px] ${active ? "text-primary" : "text-muted-foreground"}`} onClick={() => { setView(item.id); setSelectedJob(null); }}><Icon className="size-5" />{item.label}</Button>; })}
       </nav>
+      {verifyOpen && <PhoneVerify onClose={() => setVerifyOpen(null)} onVerified={() => { const next = verifyOpen; setVerifyOpen(null); next(); }} />}
       {createOpen && user && <CreateFlow userId={user.id} onClose={() => setCreateOpen(false)} />}
       {noticeOpen && user && <Notifications userId={user.id} onClose={() => setNoticeOpen(false)} />}
     </div>
@@ -199,20 +203,20 @@ function ProfileView({ userId, onLogin }: { userId?: string | undefined; onLogin
   const rename = async () => { const n = prompt("Ditt namn", data.profile?.display_name); if (n?.trim()) { await supabase.from("profiles").update({ display_name: n.trim() }).eq("id", userId); qc.invalidateQueries(); } };
   const signOut = async () => { await qc.cancelQueries(); qc.clear(); await supabase.auth.signOut(); };
   return <div className="animate-soft-in"><h1 className="text-3xl font-extrabold">Profil</h1><div className="mt-7 flex items-center gap-5"><Avatar p={data.profile} size="size-24" /><div><h2 className="text-2xl font-extrabold">{data.profile?.display_name}</h2><p className="mt-1 flex items-center gap-1 font-bold"><Star className="size-4 fill-current text-primary" /> {avg} <span className="font-normal text-muted-foreground">· {data.helped.length} uppdrag</span></p><Button variant="ghost" size="sm" className="-ml-3 mt-1" onClick={rename}>Ändra namn</Button></div></div>
-    <div className="mt-8 grid gap-3 sm:grid-cols-2"><div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-semibold"><ShieldCheck className="text-success" />E-post verifierad</div><Button variant="outline" className="h-auto justify-start p-4" onClick={() => setHistoryOpen(!historyOpen)}><CreditCard className="text-success" />Betalningshistorik<ChevronRight className={`ml-auto transition-transform ${historyOpen ? "rotate-90" : ""}`} /></Button></div>
+    <div className="mt-8 grid gap-3 sm:grid-cols-3"><div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-semibold"><ShieldCheck className="text-success" />E-post verifierad</div><PhoneBadge /><Button variant="outline" className="h-auto justify-start p-4" onClick={() => setHistoryOpen(!historyOpen)}><CreditCard className="text-success" />Betalningshistorik<ChevronRight className={`ml-auto transition-transform ${historyOpen ? "rotate-90" : ""}`} /></Button></div>
     {historyOpen && <section className="mt-6 animate-soft-in"><div className="flex items-end justify-between"><div><h2 className="text-xl font-extrabold">Betalningshistorik</h2><p className="mt-1 text-sm text-muted-foreground">Jobb du har utfört</p></div><strong className="text-success">{total} kr totalt</strong></div><div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">{data.helped.length ? data.helped.map((j, i) => <div key={j.id} className={`flex items-center gap-4 p-4 ${i ? "border-t border-border" : ""}`}><span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-lg">{j.emoji}</span><div className="min-w-0 flex-1"><p className="font-bold">{j.title}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(j.created_at).toLocaleDateString("sv-SE")}</p></div><strong className="text-success">+{payoutOf(j.price)} kr</strong></div>) : <p className="p-4 text-sm text-muted-foreground">Inga utförda jobb än.</p>}</div></section>}
     <section className="mt-9"><h2 className="text-xl font-extrabold">Omdömen</h2><div className="mt-4 space-y-3">{data.reviews.length ? data.reviews.map((r) => <div key={r.id} className="rounded-2xl border border-border bg-card p-5"><div className="text-sm text-primary">{"★".repeat(r.rating)}</div>{r.comment && <p className="mt-2 font-semibold">“{r.comment}”</p>}</div>) : <p className="text-sm text-muted-foreground">Inga omdömen än.</p>}</div></section>
     <Button variant="outline" className="mt-9" onClick={signOut}>Logga ut</Button></div>;
 }
 
-function JobDetail({ job, userId, requireAuth, onBack, onDone }: { job: Job; userId?: string | undefined; requireAuth: () => boolean; onBack: () => void; onDone: () => void }) {
+function JobDetail({ job, userId, requireVerified, onBack, onDone }: { job: Job; userId?: string | undefined; requireVerified: (next: () => void) => void; onBack: () => void; onDone: () => void }) {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState(false); const [accepted, setAccepted] = useState(false); const [err, setErr] = useState<string | null>(null);
   const own = userId === job.requester_id;
   const accept = async () => { const { data, error } = await supabase.from("jobs").update({ helper_id: userId!, status: "accepted" }).eq("id", job.id).eq("status", "open").select(); if (error || !data?.length) { setErr("Uppdraget är redan taget."); return; } qc.invalidateQueries(); setAccepted(true); };
   if (accepted) return <div className="mx-auto max-w-lg py-10 text-center animate-soft-in"><div className="mx-auto flex size-20 animate-check-pop items-center justify-center rounded-full bg-success-soft text-success"><Check className="size-10" /></div><h1 className="mt-6 text-3xl font-extrabold">Uppdraget är ditt!</h1><p className="mt-3 text-muted-foreground">{job.requester?.display_name ?? "Beställaren"} ser nu att du hjälper till.</p><Button className="mt-7" onClick={onDone}>Till mina uppdrag</Button></div>;
   return <div className="mx-auto max-w-2xl animate-soft-in"><Button variant="ghost" className="-ml-3 mb-5" onClick={onBack}><ChevronLeft /> Tillbaka</Button><div className="flex size-16 items-center justify-center rounded-2xl bg-accent text-3xl">{job.emoji}</div><div className="mt-5 flex items-start justify-between gap-4"><div><span className="text-xs font-extrabold uppercase text-primary">{job.category}</span><h1 className="mt-1 text-3xl font-extrabold">{job.title}</h1></div><strong className="text-2xl">{job.price} kr</strong></div><p className="mt-5 text-base leading-relaxed text-muted-foreground">{job.detail}</p><div className="mt-7 h-52 overflow-hidden rounded-2xl border border-border"><MapPanel compact jobs={[job]} /></div><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground"><span className="flex items-center gap-1"><MapPin className="size-4" /> {job.location}</span><span className="flex items-center gap-1"><Clock3 className="size-4" /> Publicerad för {timeAgo(job.created_at)}</span></div><div className="my-8 h-px bg-border" /><div className="flex items-center gap-4"><Avatar p={job.requester} /><div><p className="font-extrabold">{job.requester?.display_name ?? "Användare"}</p><p className="mt-1 flex items-center gap-1 text-xs font-semibold text-success"><ShieldCheck className="size-4" /> Verifierat konto</p></div></div>
-    {own ? <p className="mt-8 rounded-xl bg-secondary p-4 text-center text-sm font-semibold">Det här är ditt uppdrag.</p> : <Button size="lg" className="mt-8 w-full" onClick={() => { if (requireAuth()) setConfirm(true); }}>Jag kan hjälpa</Button>}
+    {own ? <p className="mt-8 rounded-xl bg-secondary p-4 text-center text-sm font-semibold">Det här är ditt uppdrag.</p> : <Button size="lg" className="mt-8 w-full" onClick={() => requireVerified(() => setConfirm(true))}>Jag kan hjälpa</Button>}
     {confirm && <Modal onClose={() => setConfirm(false)}><div className="text-center"><div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-accent text-primary"><WalletCards /></div><h2 className="mt-5 text-2xl font-extrabold">Vill du ta detta uppdrag?</h2><p className="mt-2 text-sm text-muted-foreground">Betalningen är säkrad innan du börjar.</p></div><PriceRows price={job.price} />{err && <p className="mt-4 text-center text-sm text-destructive">{err}</p>}<Button size="lg" className="mt-6 w-full" onClick={accept}>Acceptera uppdrag</Button></Modal>}</div>;
 }
 
@@ -243,3 +247,4 @@ function EmptyState({ onCreate }: { onCreate: () => void }) { return <div classN
 function RightPanel({ jobs, onJob }: { jobs: Job[]; onJob: (job: Job) => void }) { return <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] border-l border-border bg-card p-6 lg:block"><div className="flex items-center justify-between"><div><h2 className="font-extrabold">Nära dig</h2><p className="text-xs text-muted-foreground">Stockholm · 5 km</p></div><Button variant="ghost" size="icon" aria-label="Kartinställningar"><ListFilter /></Button></div><div className="mt-4 h-[48%] overflow-hidden rounded-2xl border border-border"><MapPanel compact jobs={jobs} onJob={onJob} /></div><h3 className="mt-6 text-xs font-extrabold uppercase text-muted-foreground">Senast publicerat</h3><div className="mt-3 space-y-2">{jobs.slice(0,2).map((j) => <button key={j.id} onClick={() => onJob(j)} className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition hover:bg-secondary"><span className="flex size-10 items-center justify-center rounded-xl bg-secondary">{j.emoji}</span><span className="min-w-0 flex-1"><strong className="block truncate text-sm">{j.title}</strong><span className="text-xs text-muted-foreground">{j.location}</span></span><strong className="text-sm">{j.price} kr</strong></button>)}</div></aside>; }
 
 function MapPanel({ tall, compact, jobs, onJob }: { tall?: boolean; compact?: boolean; jobs: Job[]; onJob?: (job: Job) => void }) { const markers = jobs.slice(0,3); return <div className={`relative w-full overflow-hidden bg-secondary ${tall ? "mt-5 h-[520px] rounded-2xl border border-border" : "h-full"}`}><div className="absolute inset-0 opacity-60" style={{ backgroundImage: "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)", backgroundSize: compact ? "34px 34px" : "52px 52px", transform: "rotate(-8deg) scale(1.2)" }} /><div className="absolute left-[18%] top-[35%] h-2 w-[75%] rotate-12 rounded-full bg-card shadow-card" /><div className="absolute left-[45%] top-[12%] h-[80%] w-2 -rotate-12 rounded-full bg-card shadow-card" />{markers.map((m,i) => <button key={m.id} aria-label={m.title} onClick={() => onJob?.(m)} className={`absolute flex cursor-pointer items-center gap-1 rounded-full border-2 border-card bg-primary px-2.5 py-1.5 text-xs font-extrabold text-primary-foreground shadow-action transition-transform hover:scale-105 ${i === 0 ? "left-[20%] top-[28%]" : i === 1 ? "right-[18%] top-[48%]" : "bottom-[18%] left-[42%]"}`}>{m.emoji} {m.price}</button>)}<div className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[5px] border-card bg-success shadow-card" /></div>; }
+function PhoneBadge() { const { user } = useSession(); const [open, setOpen] = useState(false); if (user?.phone_confirmed_at) return <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-sm font-semibold"><Smartphone className="text-success" />Telefonnummer verifierat</div>; return <><Button variant="outline" className="h-auto justify-start p-4" onClick={() => setOpen(true)}><Smartphone className="text-primary" />Verifiera telefonnummer<ChevronRight className="ml-auto" /></Button>{open && <PhoneVerify onClose={() => setOpen(false)} onVerified={() => setOpen(false)} />}</>; }
