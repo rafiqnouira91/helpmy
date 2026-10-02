@@ -120,7 +120,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      phone_verified: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

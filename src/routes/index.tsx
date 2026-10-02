@@ -45,7 +45,7 @@ function timeAgo(iso: string) {
 async function withProfiles(rows: Tables<"jobs">[]): Promise<Job[]> {
   const ids = [...new Set(rows.flatMap((r) => [r.requester_id, r.helper_id]).filter(Boolean))] as string[];
   const { data: profs } = ids.length ? await supabase.from("profiles").select("id, display_name, avatar_url").in("id", ids) : { data: [] as Profile[] };
-  const map = new Map((profs ?? []).map((p) => [p.id, p]));
+  const map = new globalThis.Map((profs ?? []).map((p) => [p.id, p]));
   return rows.map((r) => ({ ...r, emoji: EMOJI[r.category] ?? "✨", urgent: r.category === "Akut", requester: map.get(r.requester_id) }));
 }
 
@@ -80,7 +80,7 @@ const nav = [
   { id: "profile" as const, label: "Profil", icon: CircleUserRound },
 ];
 
-function Avatar({ p, size = "size-14" }: { p?: Profile | null; size?: string }) {
+function Avatar({ p, size = "size-14" }: { p?: Profile | null | undefined; size?: string }) {
   if (p?.display_name === "Ahmed" && !p.avatar_url) return <img src={ahmedProfile} alt="Ahmed" width={816} height={816} className={`${size} rounded-full object-cover`} />;
   return <div className={`${size} flex shrink-0 items-center justify-center rounded-full bg-accent text-lg font-extrabold text-accent-foreground`}>{(p?.display_name ?? "?").charAt(0).toUpperCase()}</div>;
 }
@@ -166,7 +166,7 @@ function LoginPrompt({ onLogin, text }: { onLogin: () => void; text: string }) {
 
 const STATUS: Record<string, string> = { open: "Väntar på hjälpare", accepted: "Pågår", completed: "Slutfört" };
 
-function ActivityView({ userId, onLogin }: { userId?: string; onLogin: () => void }) {
+function ActivityView({ userId, onLogin }: { userId?: string | undefined; onLogin: () => void }) {
   const [tab, setTab] = useState<"need" | "help">("need");
   const qc = useQueryClient();
   const { data = [] } = useQuery({ queryKey: ["my-jobs", userId, tab], enabled: !!userId, queryFn: async () => { const { data, error } = await supabase.from("jobs").select("*").eq(tab === "need" ? "requester_id" : "helper_id", userId!).order("created_at", { ascending: false }); if (error) throw error; return withProfiles(data); } });
@@ -181,7 +181,7 @@ function ActivityView({ userId, onLogin }: { userId?: string; onLogin: () => voi
 function ActivityGroup({ label, children }: { label: string; children: React.ReactNode }) { return <section><h2 className="mb-3 text-xs font-extrabold uppercase text-muted-foreground">{label}</h2><div className="space-y-3">{children}</div></section>; }
 function ActivityCard({ job, price, action }: { job: Job; price: number; action?: React.ReactNode }) { const done = job.status === "completed"; return <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-card"><span className="flex size-12 items-center justify-center rounded-xl bg-secondary text-xl">{job.emoji}</span><div className="min-w-0 flex-1"><h3 className="font-bold">{job.title}</h3><p className={`mt-1 flex items-center gap-1 text-sm ${done ? "text-success" : "text-muted-foreground"}`}>{done && <Check className="size-4" />}{STATUS[job.status]}</p>{action && <div className="mt-2">{action}</div>}</div><strong>{price} kr</strong></div>; }
 
-function ProfileView({ userId, onLogin }: { userId?: string; onLogin: () => void }) {
+function ProfileView({ userId, onLogin }: { userId?: string | undefined; onLogin: () => void }) {
   const qc = useQueryClient();
   const [historyOpen, setHistoryOpen] = useState(false);
   const { data } = useQuery({ queryKey: ["profile-full", userId], enabled: !!userId, queryFn: async () => {
@@ -205,7 +205,7 @@ function ProfileView({ userId, onLogin }: { userId?: string; onLogin: () => void
     <Button variant="outline" className="mt-9" onClick={signOut}>Logga ut</Button></div>;
 }
 
-function JobDetail({ job, userId, requireAuth, onBack, onDone }: { job: Job; userId?: string; requireAuth: () => boolean; onBack: () => void; onDone: () => void }) {
+function JobDetail({ job, userId, requireAuth, onBack, onDone }: { job: Job; userId?: string | undefined; requireAuth: () => boolean; onBack: () => void; onDone: () => void }) {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState(false); const [accepted, setAccepted] = useState(false); const [err, setErr] = useState<string | null>(null);
   const own = userId === job.requester_id;
