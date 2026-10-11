@@ -97,7 +97,7 @@ function App() {
   const { data: me } = useQuery({ queryKey: ["profile", user?.id], enabled: !!user, queryFn: async () => (await supabase.from("profiles").select("id, display_name, avatar_url").eq("id", user!.id).maybeSingle()).data });
   const [verifyOpen, setVerifyOpen] = useState<null | (() => void)>(null);
   const requireAuth = () => { if (!user) { navigate({ to: "/auth" }); return false; } return true; };
-  const requireVerified = (next: () => void) => { if (!requireAuth()) return; if (user?.phone_confirmed_at) next(); else setVerifyOpen(() => next); };
+  const requireVerified = (next: () => void) => { if (!requireAuth()) return; if (!PHONE_REQUIRED || user?.phone_confirmed_at) next(); else setVerifyOpen(() => next); };
   const openCreate = () => requireVerified(() => setCreateOpen(true));
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -168,18 +168,19 @@ function ExploreView({ jobs, onJob, onCreate }: { jobs: Job[]; onJob: (job: Job)
 
 function LoginPrompt({ onLogin, text }: { onLogin: () => void; text: string }) { return <div className="rounded-2xl border border-dashed border-border py-12 text-center"><p className="font-bold">{text}</p><Button className="mt-5" onClick={onLogin}>Logga in</Button></div>; }
 
-const STATUS: Record<string, string> = { open: "Väntar på hjälpare", accepted: "Pågår", completed: "Slutfört" };
+const PHONE_REQUIRED = false; // matchar public.phone_required() i databasen
+const STATUS: Record<string, string> = { open: "Väntar på hjälpare", accepted: "Pågår", pending_approval: "Väntar på godkännande", completed: "Slutfört" };
 
 function ActivityView({ userId, onLogin }: { userId?: string | undefined; onLogin: () => void }) {
   const [tab, setTab] = useState<"need" | "help">("need");
   const qc = useQueryClient();
   const { data = [] } = useQuery({ queryKey: ["my-jobs", userId, tab], enabled: !!userId, queryFn: async () => { const { data, error } = await supabase.from("jobs").select("*").eq(tab === "need" ? "requester_id" : "helper_id", userId!).order("created_at", { ascending: false }); if (error) throw error; return withProfiles(data); } });
   if (!userId) return <div className="animate-soft-in"><h1 className="mb-6 text-3xl font-extrabold">Aktivitet</h1><LoginPrompt onLogin={onLogin} text="Logga in för att se dina uppdrag." /></div>;
-  const complete = async (job: Job) => { await supabase.from("jobs").update({ status: "completed" }).eq("id", job.id); qc.invalidateQueries(); };
+  const setStatus = async (job: Job, from: string, to: string) => { const { error } = await supabase.from("jobs").update({ status: to }).eq("id", job.id).eq("status", from); if (error) alert("Det gick inte att uppdatera uppdraget."); qc.invalidateQueries(); };
   const review = async (job: Job, rating: number) => { await supabase.from("reviews").insert({ job_id: job.id, reviewer_id: userId, reviewee_id: tab === "need" ? job.helper_id! : job.requester_id, rating }); qc.invalidateQueries(); };
   const active = data.filter((j) => j.status !== "completed"), done = data.filter((j) => j.status === "completed");
   return <div className="animate-soft-in"><h1 className="text-3xl font-extrabold">Aktivitet</h1><div className="mt-6 grid grid-cols-2 rounded-xl bg-secondary p-1"><Button variant={tab === "need" ? "outline" : "ghost"} onClick={() => setTab("need")}>Jag behöver hjälp</Button><Button variant={tab === "help" ? "outline" : "ghost"} onClick={() => setTab("help")}>Jag hjälper</Button></div>
-    <div className="mt-8 space-y-7"><ActivityGroup label="Aktivt">{active.length ? active.map((j) => <ActivityCard key={j.id} job={j} price={tab === "need" ? j.price : payoutOf(j.price)} action={tab === "need" && j.status === "accepted" ? <Button size="sm" onClick={() => complete(j)}>Markera klart</Button> : null} />) : <p className="text-sm text-muted-foreground">Inga aktiva uppdrag.</p>}</ActivityGroup>
+    <div className="mt-8 space-y-7"><ActivityGroup label="Aktivt">{active.length ? active.map((j) => <ActivityCard key={j.id} job={j} price={tab === "need" ? j.price : payoutOf(j.price)} action={tab === "help" && j.status === "accepted" ? <Button size="sm" onClick={() => setStatus(j, "accepted", "pending_approval")}>Jag är klar</Button> : tab === "need" && j.status === "pending_approval" ? <Button size="sm" onClick={() => setStatus(j, "pending_approval", "completed")}>Godkänn och avsluta</Button> : null} />) : <p className="text-sm text-muted-foreground">Inga aktiva uppdrag.</p>}</ActivityGroup>
     <ActivityGroup label="Slutfört">{done.length ? done.map((j) => <ActivityCard key={j.id} job={j} price={tab === "need" ? j.price : payoutOf(j.price)} action={<span className="flex">{[1,2,3,4,5].map((n) => <button key={n} aria-label={`${n} stjärnor`} onClick={() => review(j, n)} className="text-primary">★</button>)}</span>} />) : <p className="text-sm text-muted-foreground">Inga slutförda uppdrag än.</p>}</ActivityGroup></div></div>;
 }
 function ActivityGroup({ label, children }: { label: string; children: React.ReactNode }) { return <section><h2 className="mb-3 text-xs font-extrabold uppercase text-muted-foreground">{label}</h2><div className="space-y-3">{children}</div></section>; }

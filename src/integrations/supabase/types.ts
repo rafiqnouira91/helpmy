@@ -120,6 +120,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_transact: { Args: never; Returns: boolean }
+      phone_required: { Args: never; Returns: boolean }
       phone_verified: { Args: never; Returns: boolean }
     }
     Enums: {
