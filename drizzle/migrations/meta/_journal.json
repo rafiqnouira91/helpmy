@@ -36,6 +36,13 @@
       "when": 1791907073464,
       "tag": "0004_drop_unused_avatar_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791907220816,
+      "tag": "0005_restrict_public_reads",
+      "breakpoints": true
     }
   ]
 }
