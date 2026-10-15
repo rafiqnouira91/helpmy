@@ -52,9 +52,9 @@ function AuthPage() {
         <h1 className="mt-6 text-2xl font-extrabold">{mode === "in" ? "Välkommen tillbaka" : "Skapa konto"}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{mode === "in" ? "Logga in för att lägga ut och ta uppdrag." : "Det tar mindre än en minut."}</p>
         <div className="mt-6 space-y-3">
-          {mode === "up" && <input className={input} placeholder="Ditt namn" value={name} onChange={(e) => setName(e.target.value)} required />}
-          <input className={input} type="email" placeholder="E-post" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className={input} type="password" placeholder="Lösenord (minst 6 tecken)" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {mode === "up" && <input className={input} aria-label="Ditt namn" placeholder="Ditt namn" value={name} onChange={(e) => setName(e.target.value)} required />}
+          <input className={input} type="email" aria-label="E-post" placeholder="E-post" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className={input} type="password" aria-label="Lösenord" placeholder="Lösenord (minst 6 tecken)" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {msg && <p className="mt-4 rounded-xl bg-secondary p-3 text-sm">{msg}</p>}
         <Button size="lg" className="mt-6 w-full" disabled={busy}>{mode === "in" ? "Logga in" : "Skapa konto"}</Button>
