@@ -45,8 +45,8 @@ export function PhoneVerify({ onClose, onVerified }: { onClose: () => void; onVe
         </p>
         <div className="mt-6">
           {step === "phone"
-            ? <input className={input} type="tel" inputMode="tel" placeholder="070 123 45 67" value={phone} onChange={(e) => setPhone(e.target.value)} autoFocus />
-            : <input className={`${input} text-center tracking-[0.5em]`} inputMode="numeric" maxLength={6} placeholder="••••••" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} autoFocus />}
+            ? <input className={input} type="tel" inputMode="tel" aria-label="Telefonnummer" placeholder="070 123 45 67" value={phone} onChange={(e) => setPhone(e.target.value)} autoFocus />
+            : <input className={`${input} text-center tracking-[0.5em]`} inputMode="numeric" maxLength={6} aria-label="Verifieringskod" placeholder="••••••" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} autoFocus />}
         </div>
         {err && <p className="mt-3 text-sm text-destructive">{err}</p>}
         {step === "phone"
