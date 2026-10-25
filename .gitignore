@@ -33,3 +33,9 @@ dist-ssr
 
 # GitHub Pages browser build
 dist-pages/
+
+.env
+.env.*
+!.env.example
+!.env.stripe.example
+!.env.pages

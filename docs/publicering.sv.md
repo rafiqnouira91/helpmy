@@ -14,7 +14,7 @@ Workflow-filen är förberedd; den är inte körd eller publicerad från denna a
 
 Bygget använder `bun install --frozen-lockfile` med Bun 1.3.14 och Node 24. Låsfilens Lovable-spegeladresser har ersatts med publika npm-adresser; versionsnummer och integritetskontrollsummor är oförändrade. Ingen privat Lovable-registernyckel behövs för installationen.
 
-Workflow bygger med `npm run build:pages` och publicerar **enbart `dist-pages`**. Varken källkodens `.env`-fil, Node-servern eller servernycklar ska laddas upp som Pages-artifakt. Endast `VITE_*`-variabler bäddas in i webbläsarbygget. Repots befintliga `.env` innehåller den publika Supabase-konfiguration som används nu; kontrollera rätt projekt innan publicering. Lägg aldrig hemligheter i `VITE_*`-variabler.
+Workflow bygger med `npm run build:pages` och publicerar **enbart `dist-pages`**. Varken källkodens `.env`-fil, Node-servern eller servernycklar ska laddas upp som Pages-artifakt. Endast `VITE_*`-variabler bäddas in i webbläsarbygget. Repots `.env.pages` innehåller enbart den publika Supabase-konfiguration som används vid Pages-bygget; kontrollera rätt projekt innan publicering. Lägg aldrig hemligheter i `VITE_*`-variabler.
 
 Standardadressen för byggda filer är `/helpmy/`. Workflow sätter automatiskt undermappen utifrån repots namn. Sidorna använder hash-routing, till exempel `/helpmy/#/auth`, eftersom GitHub Pages inte har en appserver för `/auth`. Ändra `PAGES_BASE_PATH` till `/` om du senare använder Pages på en egen domän direkt i roten.
 
@@ -51,7 +51,7 @@ npm run start:vps
 
 `build:vps` väljer Nitros `node-server` i stället för Cloudflare. Resultatet ligger i `.output`. VPS-versionen använder vanliga adresser som `/auth`, utan hash. Den har en riktig server som kan ta emot `/api/stripe/*` när Stripe senare konfigureras.
 
-Bygg med Node 24/Bun på VPS:en eller motsvarande Linux-arkitektur. De publika Supabase-variablerna behöver finnas vid bygget. Serverhemligheter ska däremot läggas in vid körning och aldrig skrivas in i frontendfilerna. En byggd `.output` läser inte automatiskt repots `.env` när Node startas direkt; exportera runtime-variabler eller använd systemd-miljöfilen nedan.
+Bygg med Node 24/Bun på VPS:en eller motsvarande Linux-arkitektur. De publika Supabase-variablerna behöver finnas vid bygget. Serverhemligheter ska däremot läggas in vid körning och aldrig skrivas in i frontendfilerna. `npm run start:vps` läser lokal `.env` automatiskt. Vid systemd-drift används i stället miljöfilen nedan.
 
 Planerad installation:
 

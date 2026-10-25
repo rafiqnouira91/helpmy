@@ -4,17 +4,20 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "node --env-file-if-exists=.env node_modules/vite/bin/vite.js dev --host 0.0.0.0 --port 3000 --strictPort",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "dev:pages": "vite --config vite.pages.config.ts",
-    "build:pages": "vite build --config vite.pages.config.ts && node scripts/finish-pages.mjs",
+    "dev:pages": "vite --config vite.pages.config.ts --mode pages",
+    "build:pages": "vite build --config vite.pages.config.ts --mode pages && node scripts/finish-pages.mjs",
     "preview:pages": "vite preview --config vite.pages.config.ts",
     "build:vps": "NITRO_PRESET=node-server vite build",
-    "start:vps": "node .output/server/index.mjs"
+    "start:vps": "node --env-file-if-exists=.env .output/server/index.mjs",
+    "start": "npm run start:vps",
+    "typecheck": "tsc --noEmit",
+    "test:payments": "node --experimental-strip-types --test tests/stripe.test.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
