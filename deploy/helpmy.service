@@ -1,0 +1,23 @@
+[Unit]
+Description=Helpy web application
+After=network.target
+
+[Service]
+Type=simple
+User=helpy
+Group=helpy
+WorkingDirectory=/srv/helpy/current
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+EnvironmentFile=/etc/helpy.env
+ExecStart=/usr/bin/node /srv/helpy/current/.output/server/index.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

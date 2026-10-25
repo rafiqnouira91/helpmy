@@ -33,7 +33,7 @@ function AuthPage() {
     if (mode === "up") {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { emailRedirectTo: window.location.origin, data: { display_name: name.trim() || undefined } },
+        options: { emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).href, data: { display_name: name.trim() || undefined } },
       });
       setMsg(error ? error.message : "Kolla din e-post och klicka på länken för att bekräfta kontot.");
     } else {

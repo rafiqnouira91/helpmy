@@ -577,3 +577,13 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+
+## Stripe-betalningar
+
+Se [Stripe-guiden på svenska](docs/stripe-guide.sv.md) för testkonto, Connect, serverhemligheter, SQL-migrering, webhook och testflöde. Integrationen är förberedd i koden men kräver konfiguration och ett verifierat testköp före produktion.
+
+
+## Publicering: GitHub Pages och VPS
+
+Se [publiceringsguiden](docs/publicering.sv.md). `npm run build:pages` bygger samma React-app som statiska filer i `dist-pages`, och GitHub Actions publicerar den efter att Pages har ställts om till GitHub Actions. `npm run build:vps` bygger Node-servern för en framtida VPS hos exempelvis Hostup. Lovables befintliga byggkommando finns kvar.
